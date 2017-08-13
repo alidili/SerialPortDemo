@@ -1,0 +1,14 @@
+#Fat Jar Configuration File
+#Tue Aug 23 17:19:05 CST 2016
+onejar.license.required=true
+manifest.classpath=
+manifest.removesigners=true
+onejar.checkbox=false
+jarname=SerialPortDemo.jar
+manifest.mergeall=true
+manifest.mainclass=com.yang.serialport.ui.MainFrame
+manifest.file=<createnew>
+jarname.isextern=false
+onejar.expand=
+excludes=
+includes=
