@@ -1,14 +1,4 @@
-/*
- * MainFrame.java
- *
- * Created on 2016.8.19
- */
-
 package com.yang.serialport.ui;
-
-import gnu.io.SerialPort;
-import gnu.io.SerialPortEvent;
-import gnu.io.SerialPortEventListener;
 
 import java.awt.Color;
 import java.awt.GraphicsEnvironment;
@@ -27,16 +17,14 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 
-import com.yang.serialport.exception.NoSuchPort;
-import com.yang.serialport.exception.NotASerialPort;
-import com.yang.serialport.exception.PortInUse;
-import com.yang.serialport.exception.SendDataToSerialPortFailure;
-import com.yang.serialport.exception.SerialPortOutputStreamCloseFailure;
-import com.yang.serialport.exception.SerialPortParameterFailure;
-import com.yang.serialport.exception.TooManyListeners;
-import com.yang.serialport.manage.SerialPortManager;
+import com.yang.serialport.manager.SerialPortManager;
 import com.yang.serialport.utils.ByteUtils;
 import com.yang.serialport.utils.ShowUtils;
+
+import gnu.io.PortInUseException;
+import gnu.io.SerialPort;
+import gnu.io.SerialPortEvent;
+import gnu.io.SerialPortEventListener;
 
 /**
  * 主界面
@@ -45,14 +33,9 @@ import com.yang.serialport.utils.ShowUtils;
  */
 public class MainFrame extends JFrame {
 
-	/**
-	 * 程序界面宽度
-	 */
+	// 程序界面宽度
 	public static final int WIDTH = 500;
-
-	/**
-	 * 程序界面高度
-	 */
+	// 程序界面高度
 	public static final int HEIGHT = 360;
 
 	private JTextArea dataView = new JTextArea();
@@ -88,8 +71,7 @@ public class MainFrame extends JFrame {
 		setResizable(false);
 
 		// 设置程序窗口居中显示
-		Point p = GraphicsEnvironment.getLocalGraphicsEnvironment()
-				.getCenterPoint();
+		Point p = GraphicsEnvironment.getLocalGraphicsEnvironment().getCenterPoint();
 		setBounds(p.x - WIDTH / 2, p.y - HEIGHT / 2, WIDTH, HEIGHT);
 		this.setLayout(null);
 
@@ -144,7 +126,7 @@ public class MainFrame extends JFrame {
 
 	@SuppressWarnings("unchecked")
 	private void initData() {
-		commList = SerialPortManager.findPort();
+		commList = SerialPortManager.findPorts();
 		// 检查是否有可用串口，有则加入选项中
 		if (commList == null || commList.size() < 1) {
 			ShowUtils.warningMessage("没有搜索到有效串口！");
@@ -166,8 +148,7 @@ public class MainFrame extends JFrame {
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				if ("打开串口".equals(serialPortOperate.getText())
-						&& serialport == null) {
+				if ("打开串口".equals(serialPortOperate.getText()) && serialport == null) {
 					openSerialPort(e);
 				} else {
 					closeSerialPort(e);
@@ -208,23 +189,13 @@ public class MainFrame extends JFrame {
 					dataView.setText("串口已打开" + "\r\n");
 					serialPortOperate.setText("关闭串口");
 				}
-			} catch (SerialPortParameterFailure e) {
-				e.printStackTrace();
-			} catch (NotASerialPort e) {
-				e.printStackTrace();
-			} catch (NoSuchPort e) {
-				e.printStackTrace();
-			} catch (PortInUse e) {
-				e.printStackTrace();
+			} catch (PortInUseException e) {
 				ShowUtils.warningMessage("串口已被占用！");
 			}
 		}
 
-		try {
-			SerialPortManager.addListener(serialport, new SerialListener());
-		} catch (TooManyListeners e) {
-			e.printStackTrace();
-		}
+		// 添加串口监听
+		SerialPortManager.addListener(serialport, new SerialListener());
 	}
 
 	/**
@@ -248,14 +219,7 @@ public class MainFrame extends JFrame {
 	 */
 	private void sendData(java.awt.event.ActionEvent evt) {
 		String data = dataInput.getText().toString();
-		try {
-			SerialPortManager.sendToPort(serialport,
-					ByteUtils.hexStr2Byte(data));
-		} catch (SendDataToSerialPortFailure e) {
-			e.printStackTrace();
-		} catch (SerialPortOutputStreamCloseFailure e) {
-			e.printStackTrace();
-		}
+		SerialPortManager.sendToPort(serialport, ByteUtils.hexStr2Byte(data));
 	}
 
 	private class SerialListener implements SerialPortEventListener {
@@ -266,43 +230,52 @@ public class MainFrame extends JFrame {
 
 			switch (serialPortEvent.getEventType()) {
 
-			case SerialPortEvent.BI: // 10 通讯中断
-				ShowUtils.errorMessage("与串口设备通讯中断");
-				break;
-
-			case SerialPortEvent.OE: // 7 溢位（溢出）错误
-
-			case SerialPortEvent.FE: // 9 帧错误
-
-			case SerialPortEvent.PE: // 8 奇偶校验错误
-
-			case SerialPortEvent.CD: // 6 载波检测
-
-			case SerialPortEvent.CTS: // 3 清除待发送数据
-
-			case SerialPortEvent.DSR: // 4 待发送数据准备好了
-
-			case SerialPortEvent.RI: // 5 振铃指示
-
-			case SerialPortEvent.OUTPUT_BUFFER_EMPTY: // 2 输出缓冲区已清空
-				break;
-
-			case SerialPortEvent.DATA_AVAILABLE: // 1 串口存在可用数据
+			case SerialPortEvent.DATA_AVAILABLE: // 1.串口存在可用数据
 				byte[] data = null;
 				try {
 					if (serialport == null) {
-						ShowUtils.errorMessage("串口对象为空！监听失败！");
+						ShowUtils.errorMessage("串口对象为空，监听失败！");
 					} else {
 						// 读取串口数据
 						data = SerialPortManager.readFromPort(serialport);
-						dataView.append(ByteUtils.byteArrayToHexString(data,
-								true) + "\r\n");
+						dataView.append(ByteUtils.byteArrayToHexString(data) + "\r\n");
 					}
 				} catch (Exception e) {
 					ShowUtils.errorMessage(e.toString());
 					// 发生读取错误时显示错误信息后退出系统
 					System.exit(0);
 				}
+				break;
+
+			case SerialPortEvent.OUTPUT_BUFFER_EMPTY: // 2.输出缓冲区已清空
+				break;
+
+			case SerialPortEvent.CTS: // 3.清除待发送数据
+				break;
+
+			case SerialPortEvent.DSR: // 4.待发送数据准备好了
+				break;
+
+			case SerialPortEvent.RI: // 5.振铃指示
+				break;
+
+			case SerialPortEvent.CD: // 6.载波检测
+				break;
+
+			case SerialPortEvent.OE: // 7.溢位（溢出）错误
+				break;
+
+			case SerialPortEvent.PE: // 8.奇偶校验错误
+				break;
+
+			case SerialPortEvent.FE: // 9.帧错误
+				break;
+
+			case SerialPortEvent.BI: // 10.通讯中断
+				ShowUtils.errorMessage("与串口设备通讯中断");
+				break;
+
+			default:
 				break;
 			}
 		}
