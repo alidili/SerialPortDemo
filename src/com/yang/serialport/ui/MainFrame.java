@@ -16,6 +16,8 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 
 import com.yang.serialport.manager.SerialPortManager;
 import com.yang.serialport.utils.ByteUtils;
@@ -23,20 +25,19 @@ import com.yang.serialport.utils.ShowUtils;
 
 import gnu.io.PortInUseException;
 import gnu.io.SerialPort;
-import gnu.io.SerialPortEvent;
-import gnu.io.SerialPortEventListener;
 
 /**
  * 主界面
  * 
  * @author yangle
  */
+@SuppressWarnings("all")
 public class MainFrame extends JFrame {
 
 	// 程序界面宽度
-	public static final int WIDTH = 500;
+	public final int WIDTH = 500;
 	// 程序界面高度
-	public static final int HEIGHT = 360;
+	public final int HEIGHT = 360;
 
 	private JTextArea dataView = new JTextArea();
 	private JScrollPane scrollDataView = new JScrollPane(dataView);
@@ -64,6 +65,9 @@ public class MainFrame extends JFrame {
 		initData();
 	}
 
+	/**
+	 * 初始化窗口
+	 */
 	private void initView() {
 		// 关闭程序
 		setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
@@ -78,6 +82,9 @@ public class MainFrame extends JFrame {
 		setTitle("串口通讯");
 	}
 
+	/**
+	 * 初始化控件
+	 */
 	private void initComponents() {
 		// 数据显示
 		dataView.setFocusable(false);
@@ -124,7 +131,9 @@ public class MainFrame extends JFrame {
 		operatePanel.add(sendData);
 	}
 
-	@SuppressWarnings("unchecked")
+	/**
+	 * 初始化数据
+	 */
 	private void initData() {
 		commList = SerialPortManager.findPorts();
 		// 检查是否有可用串口，有则加入选项中
@@ -143,7 +152,41 @@ public class MainFrame extends JFrame {
 		baudrateChoice.addItem("115200");
 	}
 
+	/**
+	 * 按钮监听事件
+	 */
 	private void actionListener() {
+		// 串口
+		commChoice.addPopupMenuListener(new PopupMenuListener() {
+
+			@Override
+			public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+				commList = SerialPortManager.findPorts();
+				// 检查是否有可用串口，有则加入选项中
+				if (commList == null || commList.size() < 1) {
+					ShowUtils.warningMessage("没有搜索到有效串口！");
+				} else {
+					int index = commChoice.getSelectedIndex();
+					commChoice.removeAllItems();
+					for (String s : commList) {
+						commChoice.addItem(s);
+					}
+					commChoice.setSelectedIndex(index);
+				}
+			}
+
+			@Override
+			public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
+				// NO OP
+			}
+
+			@Override
+			public void popupMenuCanceled(PopupMenuEvent e) {
+				// NO OP
+			}
+		});
+
+		// 打开|关闭串口
 		serialPortOperate.addActionListener(new ActionListener() {
 
 			@Override
@@ -156,6 +199,7 @@ public class MainFrame extends JFrame {
 			}
 		});
 
+		// 发送数据
 		sendData.addActionListener(new ActionListener() {
 
 			@Override
@@ -195,7 +239,26 @@ public class MainFrame extends JFrame {
 		}
 
 		// 添加串口监听
-		SerialPortManager.addListener(serialport, new SerialListener());
+		SerialPortManager.addListener(serialport, new SerialPortManager.DataAvailableListener() {
+
+			@Override
+			public void dataAvailable() {
+				byte[] data = null;
+				try {
+					if (serialport == null) {
+						ShowUtils.errorMessage("串口对象为空，监听失败！");
+					} else {
+						// 读取串口数据
+						data = SerialPortManager.readFromPort(serialport);
+						dataView.append(ByteUtils.byteArrayToHexString(data) + "\r\n");
+					}
+				} catch (Exception e) {
+					ShowUtils.errorMessage(e.toString());
+					// 发生读取错误时显示错误信息后退出系统
+					System.exit(0);
+				}
+			}
+		});
 	}
 
 	/**
@@ -220,65 +283,6 @@ public class MainFrame extends JFrame {
 	private void sendData(java.awt.event.ActionEvent evt) {
 		String data = dataInput.getText().toString();
 		SerialPortManager.sendToPort(serialport, ByteUtils.hexStr2Byte(data));
-	}
-
-	private class SerialListener implements SerialPortEventListener {
-		/**
-		 * 处理监控到的串口事件
-		 */
-		public void serialEvent(SerialPortEvent serialPortEvent) {
-
-			switch (serialPortEvent.getEventType()) {
-
-			case SerialPortEvent.DATA_AVAILABLE: // 1.串口存在可用数据
-				byte[] data = null;
-				try {
-					if (serialport == null) {
-						ShowUtils.errorMessage("串口对象为空，监听失败！");
-					} else {
-						// 读取串口数据
-						data = SerialPortManager.readFromPort(serialport);
-						dataView.append(ByteUtils.byteArrayToHexString(data) + "\r\n");
-					}
-				} catch (Exception e) {
-					ShowUtils.errorMessage(e.toString());
-					// 发生读取错误时显示错误信息后退出系统
-					System.exit(0);
-				}
-				break;
-
-			case SerialPortEvent.OUTPUT_BUFFER_EMPTY: // 2.输出缓冲区已清空
-				break;
-
-			case SerialPortEvent.CTS: // 3.清除待发送数据
-				break;
-
-			case SerialPortEvent.DSR: // 4.待发送数据准备好了
-				break;
-
-			case SerialPortEvent.RI: // 5.振铃指示
-				break;
-
-			case SerialPortEvent.CD: // 6.载波检测
-				break;
-
-			case SerialPortEvent.OE: // 7.溢位（溢出）错误
-				break;
-
-			case SerialPortEvent.PE: // 8.奇偶校验错误
-				break;
-
-			case SerialPortEvent.FE: // 9.帧错误
-				break;
-
-			case SerialPortEvent.BI: // 10.通讯中断
-				ShowUtils.errorMessage("与串口设备通讯中断");
-				break;
-
-			default:
-				break;
-			}
-		}
 	}
 
 	public static void main(String args[]) {

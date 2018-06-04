@@ -21,8 +21,15 @@ public class ByteUtils {
 		if (hex == null) {
 			return new byte[] {};
 		}
-		ByteBuffer buffer = ByteBuffer.allocate(hex.length() / 2);
-		for (int i = 0; i < hex.length(); i++) {
+
+		// 奇数位补0
+		if (hex.length() % 2 != 0) {
+			hex = "0" + hex;
+		}
+
+		int length = hex.length();
+		ByteBuffer buffer = ByteBuffer.allocate(length / 2);
+		for (int i = 0; i < length; i++) {
 			String hexStr = hex.charAt(i) + "";
 			i++;
 			hexStr += hex.charAt(i);
@@ -61,7 +68,6 @@ public class ByteUtils {
 		String hex = Integer.toHexString(b & 0xFF);
 		if (hex.length() == 1) {
 			hex = '0' + hex;
-
 		}
 		return hex.toUpperCase(Locale.getDefault());
 	}

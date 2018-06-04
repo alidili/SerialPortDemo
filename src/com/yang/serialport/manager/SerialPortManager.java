@@ -8,12 +8,14 @@ import java.util.Enumeration;
 import java.util.TooManyListenersException;
 
 import com.yang.serialport.utils.ArrayUtils;
+import com.yang.serialport.utils.ShowUtils;
 
 import gnu.io.CommPort;
 import gnu.io.CommPortIdentifier;
 import gnu.io.NoSuchPortException;
 import gnu.io.PortInUseException;
 import gnu.io.SerialPort;
+import gnu.io.SerialPortEvent;
 import gnu.io.SerialPortEventListener;
 import gnu.io.UnsupportedCommOperationException;
 
@@ -22,6 +24,7 @@ import gnu.io.UnsupportedCommOperationException;
  * 
  * @author yangle
  */
+@SuppressWarnings("all")
 public class SerialPortManager {
 
 	/**
@@ -29,7 +32,6 @@ public class SerialPortManager {
 	 * 
 	 * @return 可用端口名称列表
 	 */
-	@SuppressWarnings("unchecked")
 	public static final ArrayList<String> findPorts() {
 		// 获得当前所有可用串口
 		Enumeration<CommPortIdentifier> portList = CommPortIdentifier.getPortIdentifiers();
@@ -64,6 +66,9 @@ public class SerialPortManager {
 				SerialPort serialPort = (SerialPort) commPort;
 				try {
 					// 设置一下串口的波特率等参数
+					// 数据位：8
+					// 停止位：1
+					// 校验位：None
 					serialPort.setSerialPortParams(baudrate, SerialPort.DATABITS_8, SerialPort.STOPBITS_1,
 							SerialPort.PARITY_NONE);
 				} catch (UnsupportedCommOperationException e) {
@@ -157,18 +162,81 @@ public class SerialPortManager {
 	 * @param port
 	 *            串口对象
 	 * @param listener
-	 *            串口监听器
+	 *            串口存在有效数据监听
 	 */
-	public static void addListener(SerialPort port, SerialPortEventListener listener) {
+	public static void addListener(SerialPort serialPort, DataAvailableListener listener) {
 		try {
 			// 给串口添加监听器
-			port.addEventListener(listener);
+			serialPort.addEventListener(new SerialPortListener(listener));
 			// 设置当有数据到达时唤醒监听接收线程
-			port.notifyOnDataAvailable(true);
+			serialPort.notifyOnDataAvailable(true);
 			// 设置当通信中断时唤醒中断线程
-			port.notifyOnBreakInterrupt(true);
+			serialPort.notifyOnBreakInterrupt(true);
 		} catch (TooManyListenersException e) {
 			e.printStackTrace();
 		}
+	}
+
+	/**
+	 * 串口监听
+	 */
+	public static class SerialPortListener implements SerialPortEventListener {
+
+		private DataAvailableListener mDataAvailableListener;
+
+		public SerialPortListener(DataAvailableListener mDataAvailableListener) {
+			this.mDataAvailableListener = mDataAvailableListener;
+		}
+
+		public void serialEvent(SerialPortEvent serialPortEvent) {
+			switch (serialPortEvent.getEventType()) {
+			case SerialPortEvent.DATA_AVAILABLE: // 1.串口存在有效数据
+				if (mDataAvailableListener != null) {
+					mDataAvailableListener.dataAvailable();
+				}
+				break;
+
+			case SerialPortEvent.OUTPUT_BUFFER_EMPTY: // 2.输出缓冲区已清空
+				break;
+
+			case SerialPortEvent.CTS: // 3.清除待发送数据
+				break;
+
+			case SerialPortEvent.DSR: // 4.待发送数据准备好了
+				break;
+
+			case SerialPortEvent.RI: // 5.振铃指示
+				break;
+
+			case SerialPortEvent.CD: // 6.载波检测
+				break;
+
+			case SerialPortEvent.OE: // 7.溢位（溢出）错误
+				break;
+
+			case SerialPortEvent.PE: // 8.奇偶校验错误
+				break;
+
+			case SerialPortEvent.FE: // 9.帧错误
+				break;
+
+			case SerialPortEvent.BI: // 10.通讯中断
+				ShowUtils.errorMessage("与串口设备通讯中断");
+				break;
+
+			default:
+				break;
+			}
+		}
+	}
+
+	/**
+	 * 串口存在有效数据监听
+	 */
+	public interface DataAvailableListener {
+		/**
+		 * 串口存在有效数据
+		 */
+		void dataAvailable();
 	}
 }
