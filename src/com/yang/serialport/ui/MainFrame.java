@@ -86,7 +86,7 @@ public class MainFrame extends JFrame {
 		setBounds(p.x - WIDTH / 2, p.y - HEIGHT / 2, WIDTH, HEIGHT);
 		this.setLayout(null);
 
-		setTitle("串口通讯");
+		setTitle("串口通信");
 	}
 
 	/**
